@@ -19,7 +19,14 @@ def escape_ics(text):
             .replace(";", "\\;"))
 
 def get_meeting_links():
-    response = requests.get(SOURCE_URL, timeout=30)
+  response = requests.get(
+    SOURCE_URL,
+    headers={
+        "User-Agent": "Mozilla/5.0 (compatible; CRBCalendar/1.0)",
+        "Accept": "text/html,application/xhtml+xml"
+    },
+    timeout=30
+)
     response.raise_for_status()
     soup = BeautifulSoup(response.text, "html.parser")
     links = set()
