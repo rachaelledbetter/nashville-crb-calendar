@@ -1,7 +1,6 @@
 
-import requests
-from bs4 import BeautifulSoup
-from datetime import datetime, timedelta
+from playwright.sync_api import sync_playwright
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from urllib.parse import urljoin
 from pathlib import Path
@@ -12,72 +11,57 @@ SOURCE_URL = "https://www.nashville.gov/departments/community-review/boards/comm
 OUTPUT = Path("crb-meetings.ics")
 TIMEZONE = ZoneInfo("America/Chicago")
 
-def escape_ics(text):
-    return (str(text).replace("\\", "\\\\")
+def escape_ics(value):
+    return (str(value).replace("\\", "\\\\")
             .replace("\n", "\\n")
             .replace(",", "\\,")
             .replace(";", "\\;"))
 
-def get_meeting_links():
-  response = requests.get(
-    SOURCE_URL,
-    headers={
-        "User-Agent": "Mozilla/5.0 (compatible; CRBCalendar/1.0)",
-        "Accept": "text/html,application/xhtml+xml"
-    },
-    timeout=30
-)
-    response.raise_for_status()
-    soup = BeautifulSoup(response.text, "html.parser")
-    links = set()
+def parse_time(value):
+    value = re.sub(r"\.", "", value).strip().upper()
+    return datetime.strptime(value, "%I:%M %p").time()
 
-    for a in soup.find_all("a", href=True):
-        url = urljoin(SOURCE_URL, a["href"])
-        if re.search(r"/meetings/[^/?#]+/20\d{2}-\d{2}-\d{2}", url):
-            links.add(url.split("?")[0])
+def extract_meeting(page, url):
+    page.goto(url, wait_until="domcontentloaded", timeout=60000)
 
-    return sorted(links)
+    text = page.locator("body").inner_text()
 
-def parse_meeting(url):
-    response = requests.get(url, timeout=30)
-    response.raise_for_status()
-    soup = BeautifulSoup(response.text, "html.parser")
-
-    title = soup.find("h1")
-    title = title.get_text(" ", strip=True) if title else "CRB Meeting"
-
-    date_match = re.search(r"(20\d{2}-\d{2}-\d{2})", url)
-    if not date_match:
-        return None
-
-    date = datetime.strptime(date_match.group(1), "%Y-%m-%d")
-
-    text = soup.get_text(" ", strip=True)
+    date_match = re.search(
+        r"\bDate\s+([A-Za-z]+ \d{1,2}, 20\d{2})", text
+    )
 
     time_match = re.search(
-        r"(\d{1,2}:\d{2})\s*([AP]M)\s*(?:-|–|to)\s*"
-        r"(\d{1,2}:\d{2})\s*([AP]M)",
+        r"\bTime\s+(\d{1,2}:\d{2}\s*[ap]\.?m\.?)"
+        r"\s*[-–]\s*"
+        r"(\d{1,2}:\d{2}\s*[ap]\.?m\.?)",
         text,
         re.IGNORECASE
     )
 
-    if not time_match:
-        print(f"Skipping (time not found): {url}")
+    if not date_match or not time_match:
+        print(f"Skipping (date/time missing): {url}")
         return None
 
-    start_str = f"{date.date()} {time_match[1]} {time_match[2]}"
-    end_str = f"{date.date()} {time_match[3]} {time_match[4]}"
+    date = datetime.strptime(date_match.group(1), "%B %d, %Y").date()
+    start_time = parse_time(time_match.group(1))
+    end_time = parse_time(time_match.group(2))
 
-    start = datetime.strptime(start_str, "%Y-%m-%d %I:%M %p")
-    end = datetime.strptime(end_str, "%Y-%m-%d %I:%M %p")
-
-    start = start.replace(tzinfo=TIMEZONE)
-    end = end.replace(tzinfo=TIMEZONE)
+    start = datetime.combine(date, start_time, TIMEZONE)
+    end = datetime.combine(date, end_time, TIMEZONE)
 
     if end <= start:
         end += timedelta(days=1)
 
-    uid = hashlib.sha256(url.encode()).hexdigest()[:20] + "@nashville-crb"
+    title_match = re.search(
+        r"(Community Review Board Meeting(?:,\s*[A-Za-z]+ \d{1,2}, 20\d{2})?)",
+        text
+    )
+
+    title = "Community Review Board Meeting"
+    if "Special" in text[:1000]:
+        title = "CRB Special Meeting"
+
+    uid = hashlib.sha256(url.encode()).hexdigest()[:24] + "@nashville-crb"
 
     return {
         "uid": uid,
@@ -88,30 +72,54 @@ def parse_meeting(url):
     }
 
 def generate_calendar():
-    links = get_meeting_links()
-    print(f"Found {len(links)} meeting links")
-
     meetings = []
 
-    for url in links:
-        try:
-            meeting = parse_meeting(url)
-            if meeting:
-                meetings.append(meeting)
-        except Exception as error:
-            print(f"Error processing {url}: {error}")
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+
+        response = page.goto(
+            SOURCE_URL,
+            wait_until="domcontentloaded",
+            timeout=60000
+        )
+
+        if not response or response.status != 200:
+            raise RuntimeError("Could not load Nashville.gov meetings page.")
+
+        links = set()
+
+        for link in page.locator('a[href*="/meetings/"]').all():
+            href = link.get_attribute("href")
+            if not href:
+                continue
+
+            url = urljoin(SOURCE_URL, href)
+
+            if re.search(r"/meetings/[^/?#]+/20\d{2}-\d{2}-\d{2}", url):
+                links.add(url.split("?")[0])
+
+        print(f"Found {len(links)} meeting links")
+
+        for url in sorted(links):
+            try:
+                meeting = extract_meeting(page, url)
+                if meeting:
+                    meetings.append(meeting)
+            except Exception as error:
+                print(f"Error reading {url}: {error}")
+
+        browser.close()
 
     if not meetings:
-        raise RuntimeError(
-            "No meetings parsed. Check the Nashville.gov page format."
-        )
+        raise RuntimeError("No meetings found. Calendar not overwritten.")
 
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
     lines = [
         "BEGIN:VCALENDAR",
         "VERSION:2.0",
-        "PRODID:-//Nashville CRB Calendar//EN",
+        "PRODID:-//Nashville CRB//Calendar//EN",
         "CALSCALE:GREGORIAN",
         "METHOD:PUBLISH",
         "X-WR-CALNAME:Nashville Community Review Board"
@@ -131,7 +139,9 @@ def generate_calendar():
         ])
 
     lines.append("END:VCALENDAR")
+
     OUTPUT.write_text("\r\n".join(lines) + "\r\n", encoding="utf-8")
+
     print(f"Saved {len(meetings)} meetings to {OUTPUT}")
 
 if __name__ == "__main__":
