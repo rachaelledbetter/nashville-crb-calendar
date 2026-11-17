@@ -18,4 +18,14 @@ with sync_playwright() as p:
     for link in links[:10]:
         print(link.get_attribute("href"))
 
+        meeting = page.locator(
+        'a[href*="/meetings/"][href*="/2026-"]'
+    ).first
+
+    if meeting.count():
+        meeting.click()
+        page.wait_for_load_state("domcontentloaded")
+        print("Meeting page text:")
+        print(page.locator("body").inner_text()[:3000])
+
     browser.close()
