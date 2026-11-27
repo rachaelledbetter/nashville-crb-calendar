@@ -6,7 +6,7 @@ METHOD:PUBLISH
 X-WR-CALNAME:Nashville Community Review Board
 BEGIN:VEVENT
 UID:65f1ffc69c5dfa4560c570ea@nashville-crb
-DTSTAMP:20261126T223946Z
+DTSTAMP:20261127T222437Z
 DTSTART:20261116T230000Z
 DTEND:20261117T010000Z
 SUMMARY:Community Review Board Meeting
@@ -15,7 +15,7 @@ URL:https://www.nashville.gov/departments/community-review/boards/community-revi
 END:VEVENT
 BEGIN:VEVENT
 UID:b32efaa4b9f6c320740149b5@nashville-crb
-DTSTAMP:20261126T223946Z
+DTSTAMP:20261127T222437Z
 DTSTART:20260824T220000Z
 DTEND:20260825T000000Z
 SUMMARY:Community Review Board Meeting
@@ -24,7 +24,7 @@ URL:https://www.nashville.gov/departments/community-review/boards/community-revi
 END:VEVENT
 BEGIN:VEVENT
 UID:58f5be67b25725f64605cfee@nashville-crb
-DTSTAMP:20261126T223946Z
+DTSTAMP:20261127T222437Z
 DTSTART:20261214T230000Z
 DTEND:20261215T010000Z
 SUMMARY:Community Review Board Meeting
@@ -33,7 +33,7 @@ URL:https://www.nashville.gov/departments/community-review/boards/community-revi
 END:VEVENT
 BEGIN:VEVENT
 UID:d806e86e96565b65e6ac554b@nashville-crb
-DTSTAMP:20261126T223946Z
+DTSTAMP:20261127T222437Z
 DTSTART:20260727T220000Z
 DTEND:20260728T000000Z
 SUMMARY:Community Review Board Meeting
@@ -42,7 +42,7 @@ URL:https://www.nashville.gov/departments/community-review/boards/community-revi
 END:VEVENT
 BEGIN:VEVENT
 UID:c4748f7471e05599695bd3da@nashville-crb
-DTSTAMP:20261126T223946Z
+DTSTAMP:20261127T222437Z
 DTSTART:20260928T220000Z
 DTEND:20260929T000000Z
 SUMMARY:Community Review Board Meeting
@@ -51,7 +51,7 @@ URL:https://www.nashville.gov/departments/community-review/boards/community-revi
 END:VEVENT
 BEGIN:VEVENT
 UID:4884a08488d6a7dcedb7fbec@nashville-crb
-DTSTAMP:20261126T223946Z
+DTSTAMP:20261127T222437Z
 DTSTART:20261026T220000Z
 DTEND:20261027T000000Z
 SUMMARY:Community Review Board Meeting
